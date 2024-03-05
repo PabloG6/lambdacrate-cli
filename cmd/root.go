@@ -4,6 +4,8 @@ Copyright © 2024 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
+	"github.com/spf13/viper"
+	"lambdacrate-cli/lib"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -37,9 +39,11 @@ func init() {
 	// Here you will define your flags and configuration settings.
 	// Cobra supports persistent flags, which, if defined here,
 	// will be global for your application.
-
-	// rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.lambdacrate-cli.yaml)")
-
+	viper.AddConfigPath(lib.DefaultConfigFilePath())
+	viper.SetConfigName(".config")
+	viper.SetConfigType(".yaml")
+	var cfgFile string
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "$HOME/.lambdacrate/.config.yaml", "config file (default is $HOME/.lambdacrate-cli.yaml)")
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
 	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
