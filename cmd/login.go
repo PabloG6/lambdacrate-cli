@@ -5,18 +5,13 @@ package cmd
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
-	"io"
 	"lambdacrate-cli/lib"
+	"lambdacrate-cli/lib/auth"
 	"lambdacrate-cli/lib/browser"
 	"log"
-	"net/http"
 	"os"
-	"sync"
-	"time"
 )
 
 // loginCmd represents the login command
@@ -37,18 +32,12 @@ to quickly create a Cobra application.`,
 			log.Fatal("unable to load config file with error: ", err)
 		}
 
-		var wg sync.WaitGroup
 		loginUrl, token := browser.MakeLoginUrl(config.DashboardURl)
 
 		fmt.Printf("Press enter or go to the following link to authenticate with Lambdacrate %s (^C to quit)", loginUrl)
 		inputChan := make(chan int)
-
-		go func() {
-			defer wg.Done()
-			i, _ := fmt.Fscanln(os.Stdin)
-			inputChan <- i
-		}()
-
+		pollResponse := make(chan auth.PollConfirmAuthResponse)
+		//start polling the api for the confirmation response.
 		go func() {
 
 			select {
@@ -66,52 +55,15 @@ to quickly create a Cobra application.`,
 			}
 
 		}()
+		go auth.AsyncPollConfirmAuth(config, auth.PollConfirmAuthRequest{
+			Token: token,
+		}, pollResponse)
+		go func() {
+			i, _ := fmt.Fscanln(os.Stdin)
+			inputChan <- i
+		}()
+
 		//here we poll the backend to see if there was an active login session that was validated
-
-		log.Println("hello world this is to check if the person has successfully logged in")
-		for i := 0; i < 120; i++ {
-			time.Sleep(time.Second)
-			//todo parameterize this please
-			client := http.Client{}
-			url := fmt.Sprintf("%s/api/auth/cli/verify-login", config.ApiURL)
-			request, err := http.NewRequest("GET", url, nil)
-			request.Header.Set("content-type", "application/json")
-			query := request.URL.Query()
-			query.Add("token", token)
-			request.URL.RawQuery = query.Encode()
-			if err != nil {
-				log.Println(err)
-			}
-			resp, err := client.Do(request)
-			if err != nil {
-				log.Println(err)
-				continue
-
-			}
-			if resp.StatusCode == http.StatusOK {
-				body, err := io.ReadAll(resp.Body)
-				if err != nil {
-					log.Println("Failed to read response body: ", err)
-					continue
-				}
-
-				token := map[string]string{}
-				err = json.Unmarshal(body, &token)
-				if err != nil {
-					log.Fatal("failed to unmarshal response: ", err)
-				}
-				viper.Set("api_key", token["api_key"])
-				err = viper.WriteConfig()
-				if err != nil {
-					log.Fatal("failed to write api key to config file: ", err)
-				}
-				return
-
-			} else {
-
-			}
-
-		}
 
 	},
 }
